@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@master
+      - name: install deno
+        uses: denolib/setup-deno@master
+        with:
+          deno-version: 1.33.1
+      - name: install node
+        uses: actions/setup-node@master
+        with:
+          node-version: '18.x'
+          registry-url: 'https://registry.npmjs.org'
+      - name: test
+        run: deno test
+      - name: get tag version
+        if: startsWith(github.ref, 'refs/tags/')
+        id: get_tag_name
+        run: echo ::set-output name=TAG_NAME::${GITHUB_REF/refs\/tags\//}
+      - name: npm package
+        if: startsWith(github.ref, 'refs/tags/')
+        run: deno run -A ./scripts/build_npm.ts ${{steps.get_tag_name.outputs.TAG_NAME}}
+      - name: npm publish
+        if: startsWith(github.ref, 'refs/tags/')
+        run: cd npm_build && npm publish
+        env:
+          CI: true
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
